@@ -19,11 +19,19 @@ class DictCompare:
         return set(k for k in d if not k.startswith('_') and k not in ignore_keys)
 
     @classmethod
-    def delete_key_chain_from_dict(cls, orig_dict, keys):
+    def delete_key_chain_from_dict(cls, orig_dict, mapped_keys, keys):
         d = orig_dict
-        for k in keys[:-1]:
-            d = d[k]
-        d.pop(keys[-1])
+        for k in mapped_keys[:-1]:
+            d = d.get(k, {})
+        if not d:
+            return
+        for _keys in (mapped_keys, keys):
+            try:
+                d.pop(_keys[-1])
+                return
+            except KeyError:
+                # try the other key
+                pass
 
     @classmethod
     def update_dict(cls, orig_dict, new_dict):
@@ -145,7 +153,7 @@ class DictCompare:
         # modified
         for (keys, mapped_keys), (old_val, new_val) in cls.iterator(diffs.modified, **kwargs):
             if old_val is cls.NOT_FOUND:
-                cls.delete_key_chain_from_dict(test, mapped_keys)
+                cls.delete_key_chain_from_dict(test, mapped_keys, keys)
                 continue
 
             must_modify = all(k not in modification_fields for k in mapped_keys)
@@ -158,7 +166,10 @@ class DictCompare:
                 _from = new_val if value == old_val else old_val
 
             nested_dict_to_update = cls.convert_to_nested_dicts(mapped_keys, value=value)
-            changes.append("[!] '{}={}' => '{}'".format('->'.join([s for s in mapped_keys]), _from, value))
+
+            changes.append("[!] '{}={}' ==> '{}'".format('->'.join([s if isinstance(s, str) else
+                                                                    '=>'.join(list(s)) for s in mapped_keys]),
+                                                         _from, value))
             cls.update_dict(delta, nested_dict_to_update)
         return delta, changes
 
@@ -177,6 +188,8 @@ class DictCompare:
             return keys
         t = value
         for k in reversed(keys):
+            if not isinstance(k, str):
+                k = k[-1]
             d = {k: t}
             t = d
         return t
