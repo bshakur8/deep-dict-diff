@@ -33,7 +33,7 @@ def compare(
     **kwargs,
 ):
     """Compare between two dictionaries"""
-    diffs = DictDiff.empty()
+    diffs = DictDiff()
 
     # Top level
     diffs.update(added_keys(benchmark, test, **kwargs), key=key)
@@ -70,10 +70,6 @@ class DictDiff:
         self.added = added or {}
         self.removed = removed or {}
         self.modified = modified or {}
-
-    @classmethod
-    def empty(cls):
-        return cls({}, {}, {})
 
     @staticmethod
     def _update_dict(_from, _to, key):
@@ -121,13 +117,13 @@ def removed_keys(benchmark: Dict[str, Any], test: Dict[str, Any], **kwargs):
     for bench_key, mapped_key in zip(bench_keys, test_keys):
         if get_nested_value(bench_key, benchmark, NOT_FOUND) is NOT_FOUND:
             removed[mapped_key] = get_nested_value(
-                mapped_key, test, IndexError(f"{mapped_key} is not found in test")
+                mapped_key, test, AssertionError(f"{mapped_key} is not found in test")
             )
     return DictDiff(removed=removed)
 
 
 def modified_keys(shared, avoid_inner_order, key: str = None, **kwargs):
-    modify_diff = DictDiff.empty()
+    modify_diff = DictDiff()
     fix_funcs = kwargs.get("fix_funcs")
 
     for (bench_key, bench_value, mapped_keys, test_value) in shared:
@@ -166,25 +162,24 @@ def get_dict_to_update(diffs: DictDiff, benchmark: dict, test: dict, **kwargs):
         entry = convert_to_nested_dicts(
             mapped_keys,
             value=get_nested_value(
-                bench_key, diffs.added, IndexError(f"{bench_key} is not found in added")
+                bench_key, diffs.added, AssertionError(f"{bench_key} is not found in added")
             ),
         )
         logger.info(f"[dict_compare] Add a new benchmark key: {entry}")
         merge_dicts(delta, entry)
 
-    # fields that can be changed and take their changed value
+    """
+    fields that are allowed to be changed. If a modification field was changed then we keep it,
+    else we restore it. This will allow us to keep user modified changes ot specific fields
+    and to revert unofficially changes. 
+    """
     modification_fields = set(kwargs.get("modification_fields", []))
 
-    # modified
     for bench_key, mapped_keys in iterator(diffs.modified, **kwargs):
-        bench_value = get_nested_value(bench_key, benchmark, NOT_FOUND)
-        mapped_value = get_nested_value(mapped_keys, test, NOT_FOUND)
+        bench_value = get_nested_value(bench_key, benchmark, AssertionError(f"{bench_key} is not found in benchmark"))
+        mapped_value = get_nested_value(mapped_keys, test, AssertionError(f"{mapped_keys} is not found in test"))
 
         values = f"benchmark='{bench_value}', existing='{mapped_value}'"
-
-        if bench_value is NOT_FOUND:
-            exclude_dicts(test, mapped_keys, bench_key)
-            continue
 
         must_modify = all(k not in modification_fields for k in mapped_keys)
         if mapped_value is NOT_FOUND or must_modify:
@@ -192,13 +187,18 @@ def get_dict_to_update(diffs: DictDiff, benchmark: dict, test: dict, **kwargs):
             value = bench_value
             modify_type = "modify key [benchmark]"
         else:
-            # value was changed officially so we keep it and add the bench values
+            # value was officially changed so we add it to the benchmark values
             type_bench = type(bench_value)
             type_mapped = type(mapped_value)
-            if type_bench != type_mapped or type_bench not in COLLECTION_VAR:
+            if type_bench != type_mapped:
+                modify_type = "modify key [types mismatch: take benchmark]"
+                value = bench_value
+            elif type_bench not in COLLECTION_VAR:
+                # Take only user defined value
                 modify_type = "modify key [user-modified]"
                 value = mapped_value
             else:
+                # combine both benchmark and user defined changes
                 modify_type = "modify key [benchmark & user-modified]"
                 value = list(set(mapped_value).union(set(bench_value)))
 
@@ -232,21 +232,6 @@ def get_valid_keys(d, **kwargs) -> Set[str]:
 def get_valid_mapped_keys(test: Dict[str, Any], **kwargs):
     _dict = {k: test[k] for k in get_valid_keys(test, **kwargs)}
     return dict_to_key_chain(_dict)
-
-
-def exclude_dicts(orig_dict, keys_chain, keys):
-    d = orig_dict
-    for k in keys_chain[:-1]:
-        d = d.get(k, {})
-    if not d:
-        return
-    for _keys in (keys_chain, keys):
-        try:
-            d.pop(_keys[-1])
-            return
-        except KeyError:
-            # try the other key
-            pass
 
 
 def merge_dicts(orig_dict, new_dict):
