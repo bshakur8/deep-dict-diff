@@ -9,6 +9,8 @@ COLLECTION_VAR = (tuple, list, set)
 __all__ = (
     "compare",
     "update",
+    "merge_dicts",
+    "compare_with_reference",
 )
 logger = logging.getLogger()
 
@@ -43,6 +45,24 @@ def compare(
         )
     )
     return diffs
+
+
+def compare_with_reference(reference, original, updated, **kwargs):
+    # Get changes between dict and its original state
+    diffs_original = compare(benchmark=original, test=updated, **kwargs)
+
+    # return all changed values to other than the default
+    changes = []
+    # iterate over the modified keys
+    for _, mapped_keys in iterator(diffs_original.modified, **kwargs):
+        # get new value
+        new_value = get_nested_value(mapped_keys, updated, NOT_FOUND)
+        # compare it with default value
+        default_value = get_nested_value(mapped_keys, reference, NOT_FOUND)
+        if new_value != default_value:
+            # if they are different, it is a changes
+            changes.append(mapped_keys)
+    return list(set(changes))
 
 
 class DictDiff:
