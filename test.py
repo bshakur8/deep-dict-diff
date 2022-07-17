@@ -1,5 +1,5 @@
-from copy import deepcopy
 import unittest
+from copy import deepcopy
 
 import dict_compare
 
@@ -18,7 +18,7 @@ event_def_cluster = {
     "name": "NEW_NAME",  # modified
     "object_type": "Cluster",  # wasn't changed
     "property": "upgrade_state",  # wasn't changed
-    "cooldown": 1441,  # modified
+    "cooldown": 1441,  # modifed
     "text": "AM A new test message",  # modified
     "totally_distinct_key": 1,  # added
     "extra_validators": {
@@ -351,7 +351,7 @@ class TestDictCompare(unittest.TestCase):
         test = deepcopy(bundle_dict)
 
         changes = dict_compare.update(benchmark, test, **EVENT_DEF_EXTRA_ARGS)
-        print(changes)
+        self.assertEqual(changes, {'user_modified': False, 'metadata': {'property': 'popo', 'enabled': False}})
 
     def test_None_values(self):
         self.assertEqual(event_def_dict["alarm_definitions"], {})
@@ -372,7 +372,7 @@ class TestDictCompare(unittest.TestCase):
         benchmark = deepcopy(ad_new)
         test = deepcopy(ad_old)
         changes = dict_compare.update(benchmark, test, **EVENT_DEF_EXTRA_ARGS)
-        # print(changes)
+        self.assertEqual(changes, {'colldown': 30, 'user_modified': False})
 
     def test_totally_different_dicts(self):
         benchmark = deepcopy(event_def_task)
@@ -391,18 +391,11 @@ class TestDictCompare(unittest.TestCase):
         test = deepcopy(exist_event_def_task)
         dict_compare.update(benchmark, test, **EVENT_DEF_EXTRA_ARGS)
 
-    def test_compare_cluster(self):
-        benchmark = deepcopy(event_def_cluster)
-        test = deepcopy(exist_event_def_cluster)
-
-        diffs = dict_compare.update(benchmark, test, **EVENT_DEF_EXTRA_ARGS)
-        print(diffs)
-
     def test_diff_cluster(self):
         benchmark = deepcopy(event_def_cluster)
         test = deepcopy(exist_event_def_cluster)
 
-        changes = dict_compare.update(benchmark, test, **EVENT_DEF_EXTRA_ARGS)
+        dict_compare.update(benchmark, test, **EVENT_DEF_EXTRA_ARGS)
 
         self.assertEqual(test["alarm_definitions"]["severity"], "MAJOR")
         for trigger_off_value in {"NEW_CASE", "ANOTHER_CASE", "DONE"}:
@@ -769,6 +762,12 @@ class TestDictCompare(unittest.TestCase):
             diffs.modified,
             {("alarm_definitions", "trigger_off"): (("A", "B"), ("B", "A"))},
         )
+
+    def test_removed_key_from_benchmark(self):
+        benchmark = {'A': 1}
+        test = {'B': 2}
+        diffs = dict_compare.update(benchmark, test, avoid_inner_order=True)
+        self.assertEqual(diffs, {'A': 1})  # 'B' is not longer exists in A, remove it!
 
 
 if __name__ == "__main__":
