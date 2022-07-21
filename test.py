@@ -351,7 +351,13 @@ class TestDictCompare(unittest.TestCase):
         test = deepcopy(bundle_dict)
 
         changes = dict_compare.update(benchmark, test, **EVENT_DEF_EXTRA_ARGS)
-        self.assertEqual(changes, {'user_modified': False, 'metadata': {'property': 'popo', 'enabled': False}})
+        self.assertEqual(
+            changes,
+            {
+                "user_modified": False,
+                "metadata": {"property": "popo", "enabled": False},
+            },
+        )
 
     def test_None_values(self):
         self.assertEqual(event_def_dict["alarm_definitions"], {})
@@ -372,7 +378,7 @@ class TestDictCompare(unittest.TestCase):
         benchmark = deepcopy(ad_new)
         test = deepcopy(ad_old)
         changes = dict_compare.update(benchmark, test, **EVENT_DEF_EXTRA_ARGS)
-        self.assertEqual(changes, {'colldown': 30, 'user_modified': False})
+        self.assertEqual(changes, {"colldown": 30, "user_modified": False})
 
     def test_totally_different_dicts(self):
         benchmark = deepcopy(event_def_task)
@@ -478,8 +484,9 @@ class TestDictCompare(unittest.TestCase):
         }
 
         diff_kwargs = deepcopy(EVENT_DEF_EXTRA_ARGS)
+        id_ = "VAST_OBJ_TYPE: event_name=EVENT_NAME12"
         changes = dict_compare.update(
-            benchmark=benchmark, test=event_def_dict_, **diff_kwargs
+            benchmark=benchmark, test=event_def_dict_, id_=id_, **diff_kwargs
         )
         self.assertEqual(
             changes,
@@ -764,10 +771,10 @@ class TestDictCompare(unittest.TestCase):
         )
 
     def test_removed_key_from_benchmark(self):
-        benchmark = {'A': 1}
-        test = {'B': 2}
+        benchmark = {"A": 1}
+        test = {"B": 2}
         diffs = dict_compare.update(benchmark, test, avoid_inner_order=True)
-        self.assertEqual(diffs, {'A': 1})  # 'B' is not longer exists in A, remove it!
+        self.assertEqual(diffs, {"A": 1})  # 'B' is not longer exists in A, remove it!
 
 
 if __name__ == "__main__":
