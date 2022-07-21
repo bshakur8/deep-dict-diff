@@ -11,8 +11,8 @@ __all__ = (
     "merge_dicts",
     "compare_with_reference",
 )
-base_logger = logging.getLogger()
 
+base_logger = logging.getLogger()
 handler = logging.StreamHandler()
 log_format = "%(asctime)s [%(levelname)-1s]  %(message)s"
 handler.setFormatter(logging.Formatter(log_format))
@@ -21,16 +21,17 @@ base_logger.setLevel(logging.INFO)
 
 
 class DictCompareLogger:
-    def __init__(self, id_=None):
-        id_ = f"{id_}:" if id_ else ""
-        self._id = id_ or "[-]"
+    def __init__(self, diff_id=None, external_logger=None):
+        diff_id = f"{diff_id}:" if diff_id else ""
+        self._diff_id = diff_id or "[-]"
+        self._logger_to_use = external_logger or base_logger
 
     def __repr__(self):
-        return f"[dict_compare_logger] {self._id}"
+        return f"[dict_compare_logger] {self._diff_id}"
 
     def _do_log(self, msg, level="info"):
-        log_func = getattr(base_logger, level)
-        log_func(f"[dict_compare] {self._id} {msg}")
+        log_func = getattr(self._logger_to_use, level)
+        log_func(f"[dict_compare] {self._diff_id} {msg}")
 
     def info(self, msg):
         return self._do_log(msg, "info")
@@ -54,11 +55,19 @@ class DictCompareLogger:
         pp_changes = "\n".join(diffs)
         self.info(f"Changes |->\n{pp_changes}")
 
+    @classmethod
+    def init_logger(cls, diff_id, external_logger, **kwargs):
+        logger = kwargs.get("logger", None)
+        if not logger:
+            logger = cls(diff_id=diff_id, external_logger=external_logger)
+        return logger
 
-def update(benchmark, test, id_=None, avoid_inner_order=True, **kwargs):
+
+def update(benchmark, test, external_logger=None, diff_id=None, avoid_inner_order=True, **kwargs):
     """Compare first and then update according to the delta"""
-    logger = DictCompareLogger(id_)
-    kwargs["logger"] = logger
+    logger = DictCompareLogger.init_logger(diff_id, external_logger, **kwargs)
+    kwargs['logger'] = logger
+
     diffs = compare(benchmark, test, avoid_inner_order=avoid_inner_order, **kwargs)
     logger.info(f"diffs = {diffs}")
     changes = get_dict_to_update(diffs=diffs, benchmark=benchmark, test=test, **kwargs)
@@ -72,12 +81,13 @@ def compare(
     test: dict,
     key: str = None,
     avoid_inner_order: bool = False,
-    id_=None,
+    external_logger=None,
+    diff_id=None,
     **kwargs,
 ):
     """Compare between two dictionaries"""
-    if not kwargs.get("logger", None):
-        kwargs["logger"] = DictCompareLogger(id_=id_)
+    logger = DictCompareLogger.init_logger(diff_id, external_logger, **kwargs)
+    kwargs['logger'] = logger
 
     diffs = DictDiff()
     # Top level
