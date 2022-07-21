@@ -486,7 +486,7 @@ class TestDictCompare(unittest.TestCase):
         diff_kwargs = deepcopy(EVENT_DEF_EXTRA_ARGS)
         id_ = "VAST_OBJ_TYPE: event_name=EVENT_NAME12"
         changes = dict_compare.update(
-            benchmark=benchmark, test=event_def_dict_, id_=id_, **diff_kwargs
+            benchmark=benchmark, test=event_def_dict_, diff_id=id_, **diff_kwargs
         )
         self.assertEqual(
             changes,
@@ -775,6 +775,106 @@ class TestDictCompare(unittest.TestCase):
         test = {"B": 2}
         diffs = dict_compare.update(benchmark, test, avoid_inner_order=True)
         self.assertEqual(diffs, {"A": 1})  # 'B' is not longer exists in A, remove it!
+
+    def test_update_metadata(self):
+        original = {
+            "_state": "<django.db.models.base.ModelState at 0x7f40fe3e6cc0>",
+            "action_definitions": {
+                "alarm_only": True,
+                "call_home": {
+                    "subject": "License {obj} will expire in {threshold} days. Please contact VAST Data support!"
+                },
+                "send_mail": {"recipients": []},
+                "webhook": {"method": ""},
+            },
+            "alarm_definitions": {"severity": "CRITICAL", "trigger_on": ["le", 7]},
+            "cooldown": 86400,
+            "disable_actions": False,
+            "event_message": "License will expire in {threshold} days",
+            "event_type": "THRESHOLD",
+            "id": 212,
+            "internal": False,
+            "metadata": {
+                "action": {
+                    "call_home": {
+                        "subject": "License {obj} will expire in {threshold} days. Please contact VAST Data support!"
+                    }
+                },
+                "alarm": {"severity": "CRITICAL", "trigger_on": ["le", 7]},
+                "changed_fields": [],
+                "cooldown": 86400,
+                "enabled": True,
+                "event_type": "threshold",
+                "internal": False,
+                "name": "LICENSE_REMAINING_DAYS_CRITICAL",
+                "property": "remaining_days",
+                "text": "License will expire in {threshold} days",
+                "user_modified": False,
+            },
+            "name": "LICENSE_REMAINING_DAYS_CRITICAL",
+            "object_type": "License",
+        }
+
+        updated = {
+            "_state": "<django.db.models.base.ModelState at 0x7f40fd95e898>",
+            "action_definitions": {
+                "alarm_only": True,
+                "call_home": {
+                    "subject": "License {obj} will expire in {threshold} days. Please contact VAST Data support!"
+                },
+                "send_mail": {"recipients": []},
+                "webhook": {"method": ""},
+            },
+            "alarm_definitions": {"severity": "CRITICAL", "trigger_on": ["le", 7]},
+            "cooldown": 86400,
+            "disable_actions": False,
+            "event_message": "License will expire in {threshold} days",
+            "event_type": "THRESHOLD",
+            "id": 212,
+            "internal": False,
+            "metadata": {
+                "action": {
+                    "call_home": {
+                        "subject": "License {obj} will expire in {threshold} days. Please contact VAST Data support!"
+                    }
+                },
+                "alarm": {"severity": "CRITICAL", "trigger_on": ["le", 7]},
+                "changed_fields": [],
+                "cooldown": 86400,
+                "enabled": False,
+                "event_type": "threshold",
+                "internal": False,
+                "name": "LICENSE_REMAINING_DAYS_CRITICAL",
+                "property": "remaining_days",
+                "text": "License will expire in {threshold} days",
+                "user_modified": False,
+            },
+            "name": "LICENSE_REMAINING_DAYS_CRITICAL",
+            "object_type": "License",
+        }
+
+        defaults = {
+            "action": {
+                "alarm_only": True,
+                "call_home": {
+                    "subject": "License {obj} will expire in {threshold} days. Please contact VAST Data support!"
+                },
+                "send_mail": {"recipients": []},
+                "webhook": {"method": ""},
+            },
+            "alarm": {"severity": "CRITICAL", "trigger_on": ["le", 7]},
+            "cooldown": 86400,
+            "disable_actions": False,
+            "event_type": "threshold",
+            "name": "LICENSE_REMAINING_DAYS_CRITICAL",
+            "property": "remaining_days",
+            "text": "License will expire in {threshold} days",
+        }
+
+        diffs = dict_compare.compare_with_reference(
+            defaults, original, updated, avoid_inner_order=True
+        )
+        self.assertEqual(diffs, [("metadata", "enabled")])
 
 
 if __name__ == "__main__":
