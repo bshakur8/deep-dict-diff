@@ -63,10 +63,17 @@ class DictCompareLogger:
         return logger
 
 
-def update(benchmark, test, external_logger=None, diff_id=None, avoid_inner_order=True, **kwargs):
+def update(
+    benchmark,
+    test,
+    external_logger=None,
+    diff_id=None,
+    avoid_inner_order=True,
+    **kwargs,
+):
     """Compare first and then update according to the delta"""
     logger = DictCompareLogger.init_logger(diff_id, external_logger, **kwargs)
-    kwargs['logger'] = logger
+    kwargs["logger"] = logger
 
     diffs = compare(benchmark, test, avoid_inner_order=avoid_inner_order, **kwargs)
     logger.info(f"diffs = {diffs}")
@@ -87,7 +94,7 @@ def compare(
 ):
     """Compare between two dictionaries"""
     logger = DictCompareLogger.init_logger(diff_id, external_logger, **kwargs)
-    kwargs['logger'] = logger
+    kwargs["logger"] = logger
 
     diffs = DictDiff()
     # Top level
