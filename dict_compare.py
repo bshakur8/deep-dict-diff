@@ -49,9 +49,9 @@ class DictCompareLogger:
         for key, change in changes.items():
             try:
                 for change_key, change_value in change.items():
-                    diffs.append(f"{key}.{change_key}={change_value}")
+                    diffs.append(f"{key}.{change_key}='{change_value}'")
             except AttributeError:
-                diffs.append(f"{key}={change}")
+                diffs.append(f"{key}='{change}'")
         pp_changes = "\n".join(diffs)
         self.info(f"Changes |->\n{pp_changes}")
 
@@ -107,17 +107,15 @@ def compare_with_reference(reference, original, updated, **kwargs):
     diffs_original = compare(benchmark=original, test=updated, **kwargs)
 
     # return all changed values to other than the default
-    changes = []
+    changes = set()
     # iterate over the modified keys
-    for _, mapped_keys in iterator(diffs_original.modified, **kwargs):
-        # get new value
-        new_value = get_nested_value(mapped_keys, updated, NOT_FOUND)
-        # compare it with default value
-        default_value = get_nested_value(mapped_keys, reference, NOT_FOUND)
-        if new_value != default_value:
-            # if they are different, it is a changes
-            changes.append(mapped_keys)
-    return list(set(changes))
+    for mapped_keys, (default_value, new_value) in diffs_original.modified.items():
+        # get reference value
+        reference_value = get_nested_value(mapped_keys, reference, NOT_FOUND)
+        if new_value != reference_value:
+            # if they are different, it is a change
+            changes.add(mapped_keys)
+    return changes
 
 
 class DictDiff:
