@@ -12,19 +12,25 @@ __all__ = (
     "compare_with_reference",
 )
 
-base_logger = logging.getLogger()
-handler = logging.StreamHandler()
-log_format = "%(asctime)s [%(levelname)-1s]  %(message)s"
-handler.setFormatter(logging.Formatter(log_format))
-base_logger.addHandler(handler)
-base_logger.setLevel(logging.INFO)
+
+def get_logger():
+    base_logger = logging.getLogger()
+    handler = logging.StreamHandler()
+    log_format = "%(asctime)s [%(levelname)-1s]  %(message)s"
+    handler.setFormatter(logging.Formatter(log_format))
+    base_logger.addHandler(handler)
+    base_logger.setLevel(logging.INFO)
+    return base_logger
 
 
 class DictCompareLogger:
     def __init__(self, diff_id=None, external_logger=None):
         diff_id = f"{diff_id}:" if diff_id else ""
         self._diff_id = diff_id or "[-]"
-        self._logger_to_use = external_logger or base_logger
+        if external_logger:
+            self._logger_to_use = external_logger
+        else:
+            self._logger_to_use = get_logger()
 
     def __repr__(self):
         return f"[dict_compare_logger] {self._diff_id}"
@@ -118,7 +124,9 @@ def compare_with_reference(reference, original, updated, **kwargs):
     # iterate over the modified keys
     for mapped_keys, (default_value, new_value) in diffs_original.modified.items():
         # get reference value
-        reference_value = get_nested_value(mapped_keys, reference, NOT_FOUND)
+        reference_value = get_nested_value(
+            mapped_keys, reference, default=NOT_FOUND, **kwargs
+        )
         if new_value != reference_value:
             # if they are different, it is a change
             changes.add(mapped_keys)
@@ -165,7 +173,7 @@ def added_keys(benchmark: Dict[str, Any], test: Dict[str, Any], **kwargs):
     test_keys = bench_to_mapped_keys(bench_keys, **kwargs)
     added = {}
     for bench_key, mapped_key in zip(bench_keys, test_keys):
-        if get_nested_value(mapped_key, test, NOT_FOUND) is NOT_FOUND:
+        if get_nested_value(mapped_key, test, default=NOT_FOUND, **kwargs) is NOT_FOUND:
             added[bench_key] = benchmark[bench_key]
     return DictDiff(added=added)
 
@@ -175,9 +183,15 @@ def removed_keys(benchmark: Dict[str, Any], test: Dict[str, Any], **kwargs):
     bench_keys = mapped_to_bench_keys(test_keys, **kwargs)
     removed = {}
     for bench_key, mapped_key in zip(bench_keys, test_keys):
-        if get_nested_value(bench_key, benchmark, NOT_FOUND) is NOT_FOUND:
+        if (
+            get_nested_value(bench_key, benchmark, default=NOT_FOUND, **kwargs)
+            is NOT_FOUND
+        ):
             removed[mapped_key] = get_nested_value(
-                mapped_key, test, AssertionError(f"{mapped_key} is not found in test")
+                mapped_key,
+                test,
+                default=AssertionError(f"{mapped_key} is not found in test"),
+                **kwargs,
             )
     return DictDiff(removed=removed)
 
@@ -225,7 +239,8 @@ def get_dict_to_update(diffs: DictDiff, benchmark: dict, test: dict, **kwargs):
             value=get_nested_value(
                 bench_key,
                 diffs.added,
-                AssertionError(f"{bench_key} is not found in added"),
+                default=AssertionError(f"{bench_key} is not found in added"),
+                **kwargs,
             ),
         )
         logger.info(f"Add a new benchmark key: {entry}")
@@ -242,10 +257,14 @@ def get_dict_to_update(diffs: DictDiff, benchmark: dict, test: dict, **kwargs):
         bench_value = get_nested_value(
             bench_key,
             benchmark,
-            AssertionError(f"{bench_key} is not found in benchmark"),
+            default=AssertionError(f"{bench_key} is not found in benchmark"),
+            **kwargs,
         )
         mapped_value = get_nested_value(
-            mapped_keys, test, AssertionError(f"{mapped_keys} is not found in test")
+            mapped_keys,
+            test,
+            default=AssertionError(f"{mapped_keys} is not found in test"),
+            **kwargs,
         )
 
         values = f"benchmark='{bench_value}', existing='{mapped_value}'"
@@ -336,8 +355,10 @@ def get_shared_keys(benchmark, test, **kwargs):
     for bench_key, mapped_keys in iterator(benchmark, **kwargs):
         if key_to_ignore(bench_key, **kwargs):
             continue
-        bench_value = benchmark.get(bench_key, NOT_FOUND)
-        mapped_value = get_nested_value(mapped_keys, test, NOT_FOUND)
+        bench_value = get_nested_value(
+            bench_key, benchmark, default=NOT_FOUND, **kwargs
+        )
+        mapped_value = get_nested_value(mapped_keys, test, default=NOT_FOUND, **kwargs)
         if NOT_FOUND not in (mapped_value, bench_value):
             # take only keys in both dicts
             shared.append((bench_key, bench_value, mapped_keys, mapped_value))
@@ -356,22 +377,31 @@ def value_of(item: Union[COLLECTION_VAR]):
         return item
 
 
-def get_nested_value(key, _dict, default):
-    try:
-        # try a direct dict-key
-        return _dict[key]
-    except KeyError:
-        # try chained keys traverse
-        _test = deepcopy(_dict)
+def get_nested_value(key, _dict, default, **kwargs):
+    generic_key = kwargs.get("generic_key", [])
+    keys = [*generic_key]
+    if isinstance(key, COLLECTION_VAR):
+        keys.extend(key)
+    else:
+        keys.append(key)
+
+    for _key in [key, tuple(keys)]:
         try:
-            for k in key:
-                _test = _test[k]
-            return _test
-        except KeyError as e:
-            # default handling
-            if isinstance(default, Exception):
-                raise default from e
-            return default
+            # try a direct dict-key
+            return _dict[_key]
+        except KeyError:
+            # try chained keys traverse
+            _test = deepcopy(_dict)
+            try:
+                for k in _key:
+                    _test = _test[k]
+                return _test
+            except KeyError:
+                pass
+    # default handling
+    if isinstance(default, Exception):
+        raise default
+    return default
 
 
 def iterator(collection, **kwargs):

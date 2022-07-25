@@ -3,6 +3,29 @@ from copy import deepcopy
 
 import dict_compare
 
+
+EVENT_DEF_EXTRA_ARGS = {
+    "column_mapping": {
+        "action": "action_definitions",
+        "alarm": "alarm_definitions",
+        "text": "event_message",
+    },
+    "generic_key": ["metadata"],
+    "fix_funcs": {"event_type": [str.upper]},
+    "modification_fields": [
+        "severity",
+        "trigger_on",
+        "trigger_off",
+        "webhook",
+        "enabled",
+        "send_email",
+        "disable_actions",
+        "alarm_only",
+    ],
+    "changed_fields": [],
+    "ignore_keys": ["id"],
+}
+
 event_def_cluster = {
     "action": {
         "alarm_only": False,  # added
@@ -271,33 +294,6 @@ bundle_dict = {
     "object_type": "SupportBundle",
 }
 
-EVENT_DEF_EXTRA_ARGS = {
-    "column_mapping": {
-        "action": "action_definitions",
-        "alarm": "alarm_definitions",
-        "text": "event_message",
-        "property": ("metadata", "property"),
-        "trigger_off_text": ("metadata", "trigger_off_text"),
-        "trigger_on_text": ("metadata", "trigger_on_text"),
-        "enabled": ("metadata", "enabled"),
-        "time_frame": ("metadata", "time_frame"),
-        "minimum": ("metadata", "minimum"),
-    },
-    "fix_funcs": {"event_type": [str.upper]},
-    "modification_fields": [
-        "severity",
-        "trigger_on",
-        "trigger_off",
-        "webhook",
-        "enabled",
-        "send_email",
-        "disable_actions",
-        "alarm_only",
-    ],
-    "changed_fields": [],
-    "ignore_keys": ["id"],
-}
-
 
 class TestDictCompare(unittest.TestCase):
     def test_compare(self):
@@ -353,10 +349,7 @@ class TestDictCompare(unittest.TestCase):
         changes = dict_compare.update(benchmark, test, **EVENT_DEF_EXTRA_ARGS)
         self.assertEqual(
             changes,
-            {
-                "user_modified": False,
-                "metadata": {"property": "popo", "enabled": False},
-            },
+            {"property": "popo", "enabled": False},
         )
 
     def test_None_values(self):
@@ -378,7 +371,7 @@ class TestDictCompare(unittest.TestCase):
         benchmark = deepcopy(ad_new)
         test = deepcopy(ad_old)
         changes = dict_compare.update(benchmark, test, **EVENT_DEF_EXTRA_ARGS)
-        self.assertEqual(changes, {"colldown": 30, "user_modified": False})
+        self.assertEqual(changes, {"colldown": 30})
 
     def test_totally_different_dicts(self):
         benchmark = deepcopy(event_def_task)
@@ -493,7 +486,7 @@ class TestDictCompare(unittest.TestCase):
             {
                 "action_definitions": {"alarm_only": False},
                 "alarm_definitions": {"severity": "MINOR"},
-                "metadata": {"enabled": True},
+                "enabled": True,
                 "name": "CLUSTER_STATE_OBJECT_MODIFIED",
             },
         )
@@ -874,7 +867,7 @@ class TestDictCompare(unittest.TestCase):
         diffs = dict_compare.compare_with_reference(
             defaults, original, updated, avoid_inner_order=True
         )
-        self.assertEqual(diffs, [("metadata", "enabled")])
+        self.assertEqual(diffs, {("metadata", "enabled")})
 
 
 if __name__ == "__main__":
