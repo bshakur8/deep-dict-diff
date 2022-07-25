@@ -9,7 +9,6 @@ __all__ = (
     "compare",
     "update",
     "merge_dicts",
-    "compare_with_reference",
 )
 
 
@@ -113,24 +112,6 @@ def compare(
         )
     )
     return diffs
-
-
-def compare_with_reference(reference, original, updated, **kwargs):
-    # Get changes between dict and its original state
-    diffs_original = compare(benchmark=original, test=updated, **kwargs)
-
-    # return all changed values to other than the default
-    changes = set()
-    # iterate over the modified keys
-    for mapped_keys, (_, new_value) in diffs_original.modified.items():
-        # get reference value
-        reference_value = get_nested_value(
-            mapped_keys, reference, default=NOT_FOUND, **kwargs
-        )
-        if new_value != reference_value:
-            # if they are different, it is a change
-            changes.add(mapped_keys)
-    return changes
 
 
 class DictDiff:
@@ -250,7 +231,7 @@ def get_dict_to_update(diffs: DictDiff, benchmark: dict, test: dict, **kwargs):
     # else we restore it. This will allow us to keep user modified changes ot specific fields
     # and to revert unofficially changes.
 
-    modification_fields = set(kwargs.get("modification_fields", []))
+    changed_fields = list(set(tuplize(f) for f in kwargs.get("changed_fields", [])))
 
     for bench_key, mapped_keys in iterator(diffs.modified, **kwargs):
         bench_value = get_nested_value(
@@ -268,9 +249,11 @@ def get_dict_to_update(diffs: DictDiff, benchmark: dict, test: dict, **kwargs):
 
         values = f"benchmark='{bench_value}', existing='{mapped_value}'"
 
-        must_modify = all(k not in modification_fields for k in mapped_keys)
-        if mapped_value is NOT_FOUND or must_modify:
-            # either the value is a new one or it was modified unofficially and should be restored
+        # check if key wasn't modified by the user, if so we keep it,
+        # else revert it to the benchmark value
+        must_reset = bench_key not in changed_fields
+        if mapped_value is NOT_FOUND or must_reset:
+            # either the value is a new one or it wasn't modified, so we take the benchmark value
             value = bench_value
             modify_type = "modify key [benchmark]"
         else:

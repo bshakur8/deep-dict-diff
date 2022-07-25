@@ -3,7 +3,6 @@ from copy import deepcopy
 
 import dict_compare
 
-
 EVENT_DEF_EXTRA_ARGS = {
     "column_mapping": dict(
         map={
@@ -15,17 +14,16 @@ EVENT_DEF_EXTRA_ARGS = {
         generic_key=["metadata"],
     ),
     "fix_funcs": {"event_type": [str.upper]},
-    "modification_fields": [
-        "severity",
-        "trigger_on",
-        "trigger_off",
-        "webhook",
-        "enabled",
-        "send_email",
-        "disable_actions",
-        "alarm_only",
-    ],
-    "changed_fields": [],
+    # "modification_fields": [
+    #     "severity",
+    #     "trigger_on",
+    #     "trigger_off",
+    #     "webhook",
+    #     "enabled",
+    #     "send_email",
+    #     "disable_actions",
+    #     "alarm_only",
+    # ],
     "ignore_keys": ["id"],
 }
 
@@ -72,7 +70,11 @@ exist_event_def_cluster = {
     },  # change 6
     "internal": False,
     "metadata": {
-        "changed_fields": [],
+        "changed_fields": [
+            ['alarm', 'severity'],
+            ['alarm', 'trigger_off'],
+            ['disable_actions'],
+        ],
         "action": {"call_home": {"subject": "Cluster Upgrade state - {new_value}"}},
         "alarm": {
             "severity": "CRITICAL",
@@ -292,6 +294,7 @@ bundle_dict = {
         "enabled": False,
         "text": "SupportBundle {obj} {property} changed from {old_value} to {new_value}",
         "user_modified": False,
+        "changed_fields": ["enabled"],
     },
     "name": "SUPPORT_BUNDLE_STATE_CHANGED",
     "object_type": "SupportBundle",
@@ -349,7 +352,9 @@ class TestDictCompare(unittest.TestCase):
         benchmark = deepcopy(bundle)
         test = deepcopy(bundle_dict)
 
-        changes = dict_compare.update(benchmark, test, **EVENT_DEF_EXTRA_ARGS)
+        kwargs = deepcopy(EVENT_DEF_EXTRA_ARGS)
+        kwargs['changed_fields'] = test['metadata']['changed_fields']
+        changes = dict_compare.update(benchmark, test, **kwargs)
         self.assertEqual(
             changes,
             {"property": "popo", "enabled": False},
@@ -397,8 +402,9 @@ class TestDictCompare(unittest.TestCase):
         benchmark = deepcopy(event_def_cluster)
         test = deepcopy(exist_event_def_cluster)
 
-        dict_compare.update(benchmark, test, **EVENT_DEF_EXTRA_ARGS)
-
+        kwargs = deepcopy(EVENT_DEF_EXTRA_ARGS)
+        kwargs['changed_fields'] = test['metadata']['changed_fields']
+        changes = dict_compare.update(benchmark, test, avoid_inner_order=True, **kwargs)
         self.assertEqual(test["alarm_definitions"]["severity"], "MAJOR")
         for trigger_off_value in {"NEW_CASE", "ANOTHER_CASE", "DONE"}:
             self.assertIn(trigger_off_value, test["alarm_definitions"]["trigger_off"])
@@ -474,15 +480,20 @@ class TestDictCompare(unittest.TestCase):
                 "text": "Cluster {obj} {property} changed from {old_value} to {new_value}",
                 "enabled": True,  # modified
                 "user_modified": True,
+                "changed_fields": [
+                    ['enabled'],
+                    ['alarm', 'severity'],
+                    ['action', 'alarm_only'],
+                ],
             },
             "name": "CLUSTER_STATE_OBJECT_MODIFIED_11111111111111111",  # restore! because name is not supposed to change
             "object_type": "Cluster",
         }
-
-        diff_kwargs = deepcopy(EVENT_DEF_EXTRA_ARGS)
+        kwargs = deepcopy(EVENT_DEF_EXTRA_ARGS)
+        kwargs['changed_fields'] = event_def_dict_['metadata']['changed_fields']
         id_ = "VAST_OBJ_TYPE: event_name=EVENT_NAME12"
         changes = dict_compare.update(
-            benchmark=benchmark, test=event_def_dict_, diff_id=id_, **diff_kwargs
+            benchmark=benchmark, test=event_def_dict_, diff_id=id_, **kwargs
         )
         self.assertEqual(
             changes,
@@ -771,106 +782,6 @@ class TestDictCompare(unittest.TestCase):
         test = {"B": 2}
         diffs = dict_compare.update(benchmark, test, avoid_inner_order=True)
         self.assertEqual(diffs, {"A": 1})  # 'B' is not longer exists in A, remove it!
-
-    def test_update_metadata(self):
-        original = {
-            "_state": "<django.db.models.base.ModelState at 0x7f40fe3e6cc0>",
-            "action_definitions": {
-                "alarm_only": True,
-                "call_home": {
-                    "subject": "License {obj} will expire in {threshold} days. Please contact VAST Data support!"
-                },
-                "send_mail": {"recipients": []},
-                "webhook": {"method": ""},
-            },
-            "alarm_definitions": {"severity": "CRITICAL", "trigger_on": ["le", 7]},
-            "cooldown": 86400,
-            "disable_actions": False,
-            "event_message": "License will expire in {threshold} days",
-            "event_type": "THRESHOLD",
-            "id": 212,
-            "internal": False,
-            "metadata": {
-                "action": {
-                    "call_home": {
-                        "subject": "License {obj} will expire in {threshold} days. Please contact VAST Data support!"
-                    }
-                },
-                "alarm": {"severity": "CRITICAL", "trigger_on": ["le", 7]},
-                "changed_fields": [],
-                "cooldown": 86400,
-                "enabled": True,
-                "event_type": "threshold",
-                "internal": False,
-                "name": "LICENSE_REMAINING_DAYS_CRITICAL",
-                "property": "remaining_days",
-                "text": "License will expire in {threshold} days",
-                "user_modified": False,
-            },
-            "name": "LICENSE_REMAINING_DAYS_CRITICAL",
-            "object_type": "License",
-        }
-
-        updated = {
-            "_state": "<django.db.models.base.ModelState at 0x7f40fd95e898>",
-            "action_definitions": {
-                "alarm_only": True,
-                "call_home": {
-                    "subject": "License {obj} will expire in {threshold} days. Please contact VAST Data support!"
-                },
-                "send_mail": {"recipients": []},
-                "webhook": {"method": ""},
-            },
-            "alarm_definitions": {"severity": "CRITICAL", "trigger_on": ["le", 7]},
-            "cooldown": 86400,
-            "disable_actions": False,
-            "event_message": "License will expire in {threshold} days",
-            "event_type": "THRESHOLD",
-            "id": 212,
-            "internal": False,
-            "metadata": {
-                "action": {
-                    "call_home": {
-                        "subject": "License {obj} will expire in {threshold} days. Please contact VAST Data support!"
-                    }
-                },
-                "alarm": {"severity": "CRITICAL", "trigger_on": ["le", 7]},
-                "changed_fields": [],
-                "cooldown": 86400,
-                "enabled": False,
-                "event_type": "threshold",
-                "internal": False,
-                "name": "LICENSE_REMAINING_DAYS_CRITICAL",
-                "property": "remaining_days",
-                "text": "License will expire in {threshold} days",
-                "user_modified": False,
-            },
-            "name": "LICENSE_REMAINING_DAYS_CRITICAL",
-            "object_type": "License",
-        }
-
-        defaults = {
-            "action": {
-                "alarm_only": True,
-                "call_home": {
-                    "subject": "License {obj} will expire in {threshold} days. Please contact VAST Data support!"
-                },
-                "send_mail": {"recipients": []},
-                "webhook": {"method": ""},
-            },
-            "alarm": {"severity": "CRITICAL", "trigger_on": ["le", 7]},
-            "cooldown": 86400,
-            "disable_actions": False,
-            "event_type": "threshold",
-            "name": "LICENSE_REMAINING_DAYS_CRITICAL",
-            "property": "remaining_days",
-            "text": "License will expire in {threshold} days",
-        }
-
-        diffs = dict_compare.compare_with_reference(
-            defaults, original, updated, avoid_inner_order=True
-        )
-        self.assertEqual(diffs, {("metadata", "enabled")})
 
 
 if __name__ == "__main__":
