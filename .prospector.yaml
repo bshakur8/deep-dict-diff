@@ -15,7 +15,7 @@ ignore-paths:
 ignore-patterns:
   - (^|/)skip(this)?(/|$)
 autodetect: false
-max-line-length: 100
+max-line-length: 120
 
 bandit:
   run: true
