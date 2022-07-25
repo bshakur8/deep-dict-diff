@@ -1,6 +1,6 @@
 import logging
 from copy import deepcopy
-from typing import Set, Any, Dict, Union, Mapping
+from typing import Set, Any, Dict, Union
 
 
 COLLECTION_VAR = (tuple, list, set)
@@ -122,7 +122,7 @@ def compare_with_reference(reference, original, updated, **kwargs):
     # return all changed values to other than the default
     changes = set()
     # iterate over the modified keys
-    for mapped_keys, (default_value, new_value) in diffs_original.modified.items():
+    for mapped_keys, (_, new_value) in diffs_original.modified.items():
         # get reference value
         reference_value = get_nested_value(
             mapped_keys, reference, default=NOT_FOUND, **kwargs
@@ -213,7 +213,7 @@ def modified_keys(shared, avoid_inner_order, key: str = None, **kwargs):
             compare_test_value = test_value
 
         if compare_bench_value != compare_test_value:
-            if all(isinstance(v, Mapping) for v in (bench_value, test_value)):
+            if all(isinstance(v, dict) for v in (bench_value, test_value)):
                 # recursively
                 kwargs["recursive"] = True
                 diffs = compare(
@@ -246,11 +246,10 @@ def get_dict_to_update(diffs: DictDiff, benchmark: dict, test: dict, **kwargs):
         logger.info(f"Add a new benchmark key: {entry}")
         merge_dicts(delta, entry)
 
-    """
-    fields that are allowed to be changed. If a modification field was changed then we keep it,
-    else we restore it. This will allow us to keep user modified changes ot specific fields
-    and to revert unofficially changes. 
-    """
+    # fields that are allowed to be changed. If a modification field was changed then we keep it,
+    # else we restore it. This will allow us to keep user modified changes ot specific fields
+    # and to revert unofficially changes.
+
     modification_fields = set(kwargs.get("modification_fields", []))
 
     for bench_key, mapped_keys in iterator(diffs.modified, **kwargs):
@@ -327,7 +326,7 @@ def get_valid_mapped_keys(test: Dict[str, Any], **kwargs):
 def merge_dicts(orig_dict, new_dict):
     """Merge two dict by keeping both keys-values"""
     for key, val in new_dict.items():
-        if isinstance(val, Mapping):
+        if isinstance(val, dict):
             orig_dict[key] = merge_dicts(orig_dict.get(key, {}) or {}, val)
         else:
             orig_dict[key] = new_dict[key]
@@ -370,7 +369,7 @@ def key_to_ignore(key, **kwargs):
 
 
 def value_of(item: Union[COLLECTION_VAR]):
-    """align value of given collection to a sorted list"""
+    """Align value of given collection to a sorted list"""
     try:
         return sorted(list(set(item)))
     except TypeError:
@@ -423,7 +422,7 @@ def dict_to_key_chain(_dict: Dict[str, Any]):
         # {1:{2:{3:v1, 4:v2}, 5:{6:v4}}, 7:v5} ==> [(1,2,3), (1,2,4), (1,5,6), (1,7)]
         key_chains = []
         for k, v in inner_dict.items():
-            if isinstance(v, Dict):
+            if isinstance(v, dict):
                 chain = _do_convert(v)
                 for elem in chain:
                     elem = listify(elem)
