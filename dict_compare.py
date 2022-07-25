@@ -252,30 +252,47 @@ def get_dict_to_update(diffs: DictDiff, benchmark: dict, test: dict, **kwargs):
         # check if key wasn't modified by the user, if so we keep it,
         # else revert it to the benchmark value
         must_reset = bench_key not in changed_fields
-        if mapped_value is NOT_FOUND or must_reset:
-            # either the value is a new one or it wasn't modified, so we take the benchmark value
+        if mapped_value is NOT_FOUND:
+            # value is a new one: take new benchmark value
             value = bench_value
-            modify_type = "modify key [benchmark]"
+            modify_type = "modify key [new benchmark value]"
+        elif must_reset:
+            # value wasn't modified: take the benchmark value
+            value = bench_value
+            modify_type = "modify key [set benchmark value]"
         else:
             # value was officially changed so we add it to the benchmark values
             type_bench = type(bench_value)
             type_mapped = type(mapped_value)
-            if type_bench != type_mapped:
-                modify_type = "modify key [types mismatch: take benchmark]"
+            if type_bench is not type_mapped:
+                modify_type = "modify key [type mismatch: set benchmark value]"
                 value = bench_value
             elif type_bench not in COLLECTION_VAR:
-                # Take only user defined value
-                modify_type = "modify key [user-modified]"
+                # bool, int, float, string: Take only user defined value
+                modify_type = "modify key [primitive value: set user-modified value]"
                 value = mapped_value
             else:
-                # combine both benchmark and user defined changes
-                modify_type = "modify key [benchmark & user-modified]"
-                value = list(set(mapped_value).union(set(bench_value)))
+                # iterable: check that all items are of the same type
+                if is_same_type(bench_value) and is_same_type(mapped_value):
+                    # all values form the same type, combine both benchmark and user defined changes
+                    modify_type = "modify key [collection with same type: combine benchmark & user-modified]"
+                    value = list(set(mapped_value).union(set(bench_value)))
+                else:
+                    # same type, collection items not of the same type take user defined value
+                    modify_type = (
+                        "modify key [collection not with same type: set user-modified]"
+                    )
+                    value = mapped_value
 
         nested_dict_to_update = convert_to_nested_dicts(mapped_keys, value=value)
         logger.info(f"{modify_type}: '{nested_dict_to_update}'. Values: [{values}]")
         merge_dicts(delta, nested_dict_to_update)
     return delta
+
+
+def is_same_type(collection):
+    """Return True when all collection items are of the same type"""
+    return all(type(collection[0]) is type(t) for t in collection)
 
 
 def get_column_mapping(**kwargs):

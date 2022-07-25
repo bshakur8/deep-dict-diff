@@ -14,16 +14,6 @@ EVENT_DEF_EXTRA_ARGS = {
         generic_key=["metadata"],
     ),
     "fix_funcs": {"event_type": [str.upper]},
-    # "modification_fields": [
-    #     "severity",
-    #     "trigger_on",
-    #     "trigger_off",
-    #     "webhook",
-    #     "enabled",
-    #     "send_email",
-    #     "disable_actions",
-    #     "alarm_only",
-    # ],
     "ignore_keys": ["id"],
 }
 
@@ -398,7 +388,7 @@ class TestDictCompare(unittest.TestCase):
         test = deepcopy(exist_event_def_task)
         dict_compare.update(benchmark, test, **EVENT_DEF_EXTRA_ARGS)
 
-    def test_diff_cluster(self):
+    def test_modify_types(self):
         benchmark = deepcopy(event_def_cluster)
         test = deepcopy(exist_event_def_cluster)
 
@@ -406,8 +396,10 @@ class TestDictCompare(unittest.TestCase):
         kwargs['changed_fields'] = test['metadata']['changed_fields']
         changes = dict_compare.update(benchmark, test, avoid_inner_order=True, **kwargs)
         self.assertEqual(test["alarm_definitions"]["severity"], "MAJOR")
+        # combine benchmark and user-defined values
         for trigger_off_value in {"NEW_CASE", "ANOTHER_CASE", "DONE"}:
             self.assertIn(trigger_off_value, test["alarm_definitions"]["trigger_off"])
+
         for trigger_on_value in {"SHOULD_ADDED", "ROLLBACK"}:
             self.assertIn(trigger_on_value, test["alarm_definitions"]["trigger_on"])
 
@@ -782,6 +774,23 @@ class TestDictCompare(unittest.TestCase):
         test = {"B": 2}
         diffs = dict_compare.update(benchmark, test, avoid_inner_order=True)
         self.assertEqual(diffs, {"A": 1})  # 'B' is not longer exists in A, remove it!
+
+    def test_modify_type_mismatch(self):
+        benchmark = {"A": [12, 3]}
+        test = {"A": "branch new type"}
+        diffs = dict_compare.update(
+            benchmark, test, avoid_inner_order=True, changed_fields=[['A']]
+        )
+        self.assertEqual(diffs, benchmark)
+        self.assertEqual(test, benchmark)
+
+    def test_modify_type_collection_not_same_type(self):
+        benchmark = {"A": [12, 3]}
+        test = {"A": ["ge", 3]}
+        dict_compare.update(
+            benchmark, test, avoid_inner_order=True, changed_fields=[['A']]
+        )
+        self.assertEqual(test['A'], ['ge', 3])
 
 
 if __name__ == "__main__":
