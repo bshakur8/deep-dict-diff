@@ -5,12 +5,15 @@ import dict_compare
 
 
 EVENT_DEF_EXTRA_ARGS = {
-    "column_mapping": {
-        "action": "action_definitions",
-        "alarm": "alarm_definitions",
-        "text": "event_message",
-    },
-    "generic_key": ["metadata"],
+    "column_mapping": dict(
+        map={
+            "action": "action_definitions",
+            "alarm": "alarm_definitions",
+            "text": "event_message",
+        },
+        inner_key_validity=False,
+        generic_key=["metadata"],
+    ),
     "fix_funcs": {"event_type": [str.upper]},
     "modification_fields": [
         "severity",

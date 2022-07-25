@@ -296,7 +296,12 @@ def get_dict_to_update(diffs: DictDiff, benchmark: dict, test: dict, **kwargs):
 
 
 def get_column_mapping(**kwargs):
-    return {} if kwargs.get("recursive") else kwargs.get("column_mapping", {})
+    column_mapping = kwargs.get('column_mapping', {})
+    mapping = column_mapping.get("map", {})
+    if kwargs.get("recursive"):
+        if not column_mapping.get("inner_key_validity"):
+            mapping = {}
+    return mapping
 
 
 def bench_to_mapped_keys(bench_keys, **kwargs):
@@ -377,7 +382,8 @@ def value_of(item: Union[COLLECTION_VAR]):
 
 
 def get_nested_value(key, _dict, default, **kwargs):
-    generic_key = kwargs.get("generic_key", [])
+    column_mapping = kwargs.get('column_mapping', {})
+    generic_key = column_mapping.get("generic_key", [])
     keys = [*generic_key]
     if isinstance(key, COLLECTION_VAR):
         keys.extend(key)
