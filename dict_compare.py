@@ -138,7 +138,7 @@ class DictDiff:
 
     @property
     def changes(self):
-        return {"added": self.added, "removed": self.removed, "modified": self.modified}
+        return {"added": self.added, "modified": self.modified}
 
 
 class NotFoundSentinel:

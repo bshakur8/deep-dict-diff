@@ -776,6 +776,8 @@ class TestDictCompare(unittest.TestCase):
         self.assertEqual(diffs, {"A": 1})  # 'B' is not longer exists in A, remove it!
 
     def test_modify_type_mismatch(self):
+        # same key but different value collection type,
+        # should revert to the benchmark
         benchmark = {"A": [12, 3]}
         test = {"A": "branch new type"}
         diffs = dict_compare.update(
@@ -785,12 +787,64 @@ class TestDictCompare(unittest.TestCase):
         self.assertEqual(test, benchmark)
 
     def test_modify_type_collection_not_same_type(self):
+        # same key and same value collection type,
+        # but not all items types in value are the same. Should remain with the user modified
         benchmark = {"A": [12, 3]}
         test = {"A": ["ge", 3]}
         dict_compare.update(
             benchmark, test, avoid_inner_order=True, changed_fields=[['A']]
         )
         self.assertEqual(test['A'], ['ge', 3])
+
+    def test_modify_deep_innder_dict(self):
+        benchmark = {
+            "A": {
+                'A1':
+                    {
+                        'A11': [12, 3],
+                        'A12': False,
+                        'A13': {
+                            'A131': ['key1', 'key2']
+                        },
+                     },
+                'A2': 15,
+                'A3': "low"
+            },
+            "B": "bee",
+            "C": [1, 2, 3],
+            "D": {
+                "D1": {
+                    "D12": ["one", "two"]
+                },
+                "D2": [1.2, -7.4]
+            }
+        }
+        test = {
+            "A": {
+                'A1':
+                    {
+                        'A11': [12, 3],
+                        'A12': True,
+                        'A13': {
+                            'A131': ['key1', 'key2']
+                        },
+                    },
+                'A2': 15,
+                'A3': "low"
+            },           "B": "poo",
+            "C": [1, 2, 3],
+            "D": {
+                "D1": {
+                    "D12": ["one", "two"]
+                },
+                "D2": [1.2, -7.4]
+            }
+        }
+        diff = dict_compare.update(
+            benchmark, test, avoid_inner_order=True, changed_fields=[['A', 'A1', 'A22'], ['B']]
+        )
+        self.assertEqual(diff, {'A': {'A1': {'A12': False}}, "B": "poo"})
+        self.assertEqual(test['B'], 'poo')
 
 
 if __name__ == "__main__":
